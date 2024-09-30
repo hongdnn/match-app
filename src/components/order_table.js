@@ -1,33 +1,41 @@
 import React from 'react';
 
 const OrderTable = ({ orders, selectedOrders, handleOrderCheckboxChange }) => {
+
+    const handleRowClick = (order, event) => {
+        if (event.target.type !== 'checkbox') {
+            handleOrderCheckboxChange(order);
+        }
+    };
+
     return (
         <div className="table-container">
             <table border="1" className="table-style">
                 <thead>
                     <tr>
                         <th>Select</th>
-                        <th>Customer Name</th>
                         <th>Order Id</th>
-                        <th>Date</th>
                         <th>Product</th>
+                        <th>Customer Name</th>
+                        <th>Date</th>
                         <th>Price</th>
                     </tr>
                 </thead>
                 <tbody>
                     {orders.map((order) => (
-                        <tr key={order._id}>
+                        <tr key={order._id} onClick={(e) => handleRowClick(order, e)} style={{ cursor: 'pointer' }}>
                             <td>
                                 <input
                                     type="checkbox"
                                     checked={selectedOrders.some(selectedOrder => selectedOrder._id === order._id)}
                                     onChange={() => handleOrderCheckboxChange(order)}
+                                    onClick={(e) => e.stopPropagation()}
                                 />
                             </td>
-                            <td>{order.customerName}</td>
                             <td>{order.orderId}</td>
-                            <td>{order.date}</td>
                             <td>{order.product}</td>
+                            <td>{order.customerName}</td>
+                            <td>{order.date}</td>
                             <td>${order.price}</td>
                         </tr>
                     ))}
@@ -64,6 +72,43 @@ const OrderTable = ({ orders, selectedOrders, handleOrderCheckboxChange }) => {
         
                 .table-style input[type="checkbox"] {
                      cursor: pointer; /* Pointer cursor for checkbox */
+                }
+                       /* Responsive adjustments */
+                @media (max-width: 768px) {
+                    .table-style, .table-style thead, .table-style tbody, .table-style th, .table-style td, .table-style tr {
+                        display: block;
+                    }
+
+                    .table-style thead tr {
+                        display: none; /* Hide header on small screens */
+                    }
+
+                    .table-style tr {
+                        margin-bottom: 10px;
+                        border-bottom: 2px solid #ddd;
+                    }
+
+                    .table-style td {
+                        display: flex;
+                        justify-content: space-between;
+                        padding: 10px;
+                        text-align: right;
+                        border: none;
+                        position: relative;
+                    }
+
+                    .table-style td::before {
+                        content: attr(data-label);
+                        position: absolute;
+                        left: 10px;
+                        width: calc(50% - 20px); 
+                        font-weight: bold;
+                        white-space: nowrap;
+                    }
+
+                    .table-style td[data-label="Price"] {
+                        text-align: right;
+                    }
                 }
             `}</style>
         </div>

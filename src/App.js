@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { CardResult } from './components/card_result'
-import OrderTable from './components/order_table'
+import { CardResult } from './components/card_result';
+import OrderTable from './components/order_table';
 import TransactionTable from './components/transaction_table';
 
-const BASE_URL = process.env.REACT_APP_BASE_URL
+const BASE_URL = process.env.REACT_APP_BASE_URL;
 
 const App = () => {
   const [orders, setOrders] = useState([]);
@@ -12,17 +12,14 @@ const App = () => {
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [selectedTransactions, setSelectedTransactions] = useState([]);
   const [matchResult, setMatchResult] = useState([]);
-
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const ordersUrl = `${BASE_URL}/orders`;
-    const transactionsUrl = `${BASE_URL}/transactions`;
-
     const fetchData = async () => {
       try {
         const [ordersRes, transactionsRes] = await Promise.all([
-          axios.get(ordersUrl),
-          axios.get(transactionsUrl)
+          axios.get(`${BASE_URL}/orders`),
+          axios.get(`${BASE_URL}/transactions`),
         ]);
 
         setOrders(ordersRes.data.data);
@@ -35,13 +32,16 @@ const App = () => {
     fetchData();
   }, []);
 
-
   const handleOrderCheckboxChange = (order) => {
     setSelectedOrders((prevOrders) =>
       prevOrders.some((existedOrder) => existedOrder._id === order._id)
         ? prevOrders.filter((existedOrder) => existedOrder._id !== order._id)
         : [...prevOrders, order]
     );
+
+    if (selectedOrders.length >= 1 && selectedTransactions.length === 0) {
+      setMatchResult([]); 
+    }
   };
 
   const handleTransactionCheckboxChange = (transaction) => {
@@ -50,111 +50,221 @@ const App = () => {
         ? prevTransactions.filter((selectedTransaction) => selectedTransaction._id !== transaction._id)
         : [...prevTransactions, transaction]
     );
-  };
 
-  const handleMatchExact = async () => {
-    const payload = {
-      orders: selectedOrders,
-      transactions: selectedTransactions,
-    };
-    console.log("Payload: ", payload);
-    try {
-      const response = await axios.post(`${BASE_URL}/orders/matchExact`, payload);
-      setMatchResult(response.data.data);
-      console.log('Match Result:', response.data.data);
-    } catch (error) {
-      console.error('Error matching orders and transactions:', error);
+    if (selectedTransactions.length >= 1 && selectedOrders.length === 0) {
+      setMatchResult([]); 
     }
   };
 
-  const handleMatch = async () => {
+  const handleMatchRequest = async (type) => {
+    if (!selectedOrders.length || !selectedTransactions.length) {
+      alert('Please select at least one order and one transaction.');
+      return;
+    }
+
     const payload = {
       orders: selectedOrders,
       transactions: selectedTransactions,
     };
-    console.log("Payload: ", payload);
+
     try {
-      const response = await axios.post(`${BASE_URL}/orders/match`, payload);
+      setLoading(true);
+      const endpoint = type === 'exact' ? 'matchExact' : 'match';
+      const response = await axios.post(`${BASE_URL}/orders/${endpoint}`, payload);
+      console.log(response.data.data)
       setMatchResult(response.data.data);
-      console.log('Match Result:', response.data.data);
     } catch (error) {
-      console.error('Error matching orders and transactions:', error);
+      console.error(`Error in ${type} match:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onConfirmMatch = async (orderId, transactionId, status) => {
+    try {
+      const payload = {
+        orderId,
+        transactionId,
+        status
+      };
+      const response = await axios.post(`${BASE_URL}/matches/confirm`, payload);
+      if(response.status === 200) {
+        handleMatchRequest();
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error(`Error: `, error);
     }
   }
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <div style={{ padding: '50px 20px' }}>
-          <h2 style={{ color: '#00509e' }}>Orders</h2>
-          < OrderTable
-            orders={orders}
-            selectedOrders={selectedOrders}
-            handleOrderCheckboxChange={handleOrderCheckboxChange} />
+      <div className="content-container">
+        <div className="content-box">
+          <h2>Orders</h2>
+          {orders.length > 0 ? (
+            <OrderTable
+              orders={orders}
+              selectedOrders={selectedOrders}
+              handleOrderCheckboxChange={handleOrderCheckboxChange}
+            />
+          ) : (
+            <p>Loading orders...</p>
+          )}
         </div>
-        <div style={{ padding: '50px 20px' }}>
-
-          <h2 style={{ color: '#00509e' }}>Transactions</h2>
-          < TransactionTable
-            transactions={transactions}
-            selectedTransactions={selectedTransactions}
-            handleTransactionCheckboxChange={handleTransactionCheckboxChange} />
+        <div className="content-box">
+          <h2>Transactions</h2>
+          {transactions.length > 0 ? (
+            <TransactionTable
+              transactions={transactions}
+              selectedTransactions={selectedTransactions}
+              handleTransactionCheckboxChange={handleTransactionCheckboxChange}
+            />
+          ) : (
+            <p>Loading transactions...</p>
+          )}
         </div>
-
-
       </div>
-      <div style={{ textAlign: 'center', marginTop: '30px' }}>
-        <button
-          style={{
-            padding: '12px 25px',
-            margin: '0 10px',
-            backgroundColor: '#00509e',
-            width: '150px',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            flex: 1,
-            cursor: 'pointer',
-            fontSize: '1rem',
-          }}
-          onClick={handleMatchExact}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#003d7a')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#00509e')}
-        >
-          Match Exact
-        </button>
-      </div>
-      <div style={{ textAlign: 'center', marginTop: '30px' }}>
-        <button
-          style={{
-            padding: '12px 25px',
-            margin: '0 10px',
-            width: '150px',
-            backgroundColor: '#f2f7fa',
-            color: '#4682b4',
-            border: '0.5px solid #4682b4',
-            borderRadius: '5px',
-            flex: 1,
-            cursor: 'pointer',
-            fontSize: '1rem'
-          }}
-          onClick={handleMatch}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e2e6ea')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f2f7fa')}
-        >
-          Match
-        </button>
+
+      <style jsx>{`
+        .content-container {
+          display: flex;
+          justify-content: center;
+          padding: 50px 20px;
+        }
+
+        .content-box {
+          padding: 50px 20px 30px 0px;
+        }
+
+        h2 {
+          color: #00509e;
+        }
+
+        /* Large devices (desktops) */
+        @media (min-width: 1200px) {
+          .content-container {
+            flex-direction: row; /* Keep them side by side */
+          }
+
+          .content-box {
+            padding: 50px 20px 30px 0px;
+          }
+        }
+
+        /* Medium devices (tablets) */
+        @media (max-width: 1199px) and (min-width: 768px) {
+          .content-container {
+            flex-direction: column;
+            align-items: center; /* Center content on medium screens */
+          }
+
+          .content-box {
+            width: 80%;
+            padding: 40px 0; /* Adjust padding */
+          }
+        }
+
+        /* Small devices (phones) */
+        @media (max-width: 767px) {
+          .content-container {
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+          }
+
+          .content-box {
+            width: 100%;
+            padding: 20px 0; /* Minimal padding for small screens */
+          }
+
+          h2 {
+            font-size: 1.5rem; /* Reduce heading size on small devices */
+          }
+        }
+      `}</style>
+
+      <div style={{ display: 'flex', textAlign: 'center', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <button
+            style={{
+              padding: '12px 25px',
+              margin: '0 10px',
+              backgroundColor: selectedOrders.length && selectedTransactions.length ? '#00509e' : '#cccccc',
+              width: '150px',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              flex: 1,
+              cursor: selectedOrders.length && selectedTransactions.length ? 'pointer' : 'not-allowed',
+              fontSize: '1rem',
+            }}
+            onClick={() => handleMatchRequest('exact')}
+            onMouseEnter={(e) => {
+              if (!e.currentTarget.disabled) {
+                e.currentTarget.style.backgroundColor = '#003d7a';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!e.currentTarget.disabled) {
+                e.currentTarget.style.backgroundColor = '#00509e';
+              }
+            }}
+            disabled={!selectedOrders.length || !selectedTransactions.length}
+          >
+            Match Exact
+          </button>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <button
+            style={{
+              padding: '12px 25px',
+              margin: '0 10px',
+              width: '150px',
+              backgroundColor: selectedOrders.length && selectedTransactions.length ? '#f2f7fa' : '#cccccc',
+              color: '#4682b4',
+              border: '0.5px solid #4682b4',
+              borderRadius: '5px',
+              flex: 1,
+              cursor: selectedOrders.length && selectedTransactions.length ? 'pointer' : 'not-allowed',
+              fontSize: '1rem',
+            }}
+            onClick={() => handleMatchRequest()}
+            onMouseEnter={(e) => {
+              if (!e.currentTarget.disabled) {
+                e.currentTarget.style.backgroundColor = '#e2e6ea';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!e.currentTarget.disabled) {
+                e.currentTarget.style.backgroundColor = '#f2f7fa';
+              }
+            }}
+            disabled={!selectedOrders.length || !selectedTransactions.length}
+          >
+            Match
+          </button>
+        </div>
       </div>
 
       <div style={{ marginTop: '20px' }}>
-        {matchResult.map((match) => {
-          const order = match.find(item => item.type === 'order');
-          const transactions = match.filter(item => item.type === 'txn');
+        {loading ? (
+          <p style={{ textAlign: 'center' }}>
+            <strong>Matching in progress...</strong>
+          </p>
+        ) : null}
+        {matchResult.length > 0 && selectedOrders.length > 0 && selectedTransactions.length > 0 ? (
+          matchResult.map((match) => {
+            const order = match.find((item) => item.type === 'order');
+            const transactions = match.filter((item) => item.type === 'txn');
 
-          return transactions.map(txn => (
-            <CardResult key={txn._id} order={order} transaction={txn} />
-          ));
-        })}
+            return transactions.map((txn) => <CardResult key={txn._id} order={order} transaction={txn} onConfirmMatch={onConfirmMatch} />);
+          })
+        ) : (
+          <p style={{ textAlign: 'center' }}>
+            <strong>No matches found, select orders and transactions to check!</strong>
+          </p>
+        )}
       </div>
     </>
   );
